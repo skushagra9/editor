@@ -3,14 +3,22 @@
 import { BubbleMenu, Editor } from '@tiptap/react'
 import { Bold, Italic, Sparkles, ChevronDown, Link as LinkIcon, FileText, X, Check } from 'lucide-react'
 
+type AIPreview = {
+  line: string
+  range: [number, number]
+} | null
+
+
 interface Props {
   editor: Editor
   showAIMenu: boolean
   setShowAIMenu: (v: boolean) => void
   aiPreview: string | null
+  setAiPreview: (v: AIPreview) => void
   isProcessing: boolean
   processWithAI: (action: string) => void
   applyAIChange: () => void
+  
   cancelAIChange: () => void
   action: string | null
 }
@@ -20,13 +28,14 @@ export const BubbleMenuAI = ({
   showAIMenu,
   setShowAIMenu,
   aiPreview,
+  setAiPreview,
   isProcessing,
   processWithAI,
   applyAIChange,
   cancelAIChange,
   action,
 }: Props) => {
-    console.log(action)
+  console.log(action)
   return (
     <BubbleMenu
       editor={editor}
@@ -35,7 +44,10 @@ export const BubbleMenuAI = ({
     >
       <div className="flex items-center">
         <button
-          onClick={() => setShowAIMenu(!showAIMenu)}
+          onClick={() => {
+            setAiPreview(null)
+            setShowAIMenu(!showAIMenu)
+          }}
           className="flex items-center gap-1 px-3 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 border-r border-gray-200"
         >
           <Sparkles size={16} />
@@ -62,7 +74,9 @@ export const BubbleMenuAI = ({
             disabled={isProcessing}
           >
             <FileText size={16} />
-            <span className="text-sm">{isProcessing ? 'Processing...' : 'Simplify'}</span>
+            <span className="text-sm">
+              {isProcessing && action === 'simplify' ? 'Processing...' : 'Simplify'}
+            </span>
           </button>
           <button
             onClick={() => processWithAI('rewrite')}
@@ -70,10 +84,13 @@ export const BubbleMenuAI = ({
             disabled={isProcessing}
           >
             <Sparkles size={16} />
-            <span className="text-sm">{isProcessing ? 'Processing...' : 'Re-write'}</span>
+            <span className="text-sm">
+              {isProcessing && action === 'rewrite' ? 'Processing...' : 'Re-write'}
+            </span>
           </button>
         </div>
       )}
+
 
       {aiPreview && (
         <div className="mt-1 bg-blue-50 border-t border-blue-100 p-2 max-w-md">

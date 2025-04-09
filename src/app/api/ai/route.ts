@@ -4,52 +4,138 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+type StructuredResult = {
+  updatedParagraph: string;
+  replacementRange: [number, number];
+};
+
+type LinkResponse = {
+  phrase: string;
+  range: [number, number];
+  url: string;
+};
+
 export async function POST(request: Request) {
   const { text, action, paragraphText } = await request.json();
-
-  console.log(text, action, paragraphText)
 
   let systemPrompt = '';
   let userPrompt = '';
 
-  switch (action) {
-    case 'rewrite':
-      systemPrompt = 'You are a professional copy editor. Improve clarity and tone of a specific section within a larger paragraph. Only rewrite the highlighted section, but use the full paragraph for context. Preserve original meaning. Return only the rewritten version of the highlighted section.';
+  const needsStructuredOutput = action === 'rewrite' || action === 'simplify';
 
-      userPrompt = `
+  if (needsStructuredOutput) {
+    systemPrompt = `
+You are a professional editor. You will receive:
+1. A full paragraph for context.
+2. A sentence (or line) from that paragraph that should be rewritten or simplified.
+
+Your task is to improve only the selected sentence for clarity, grammar, or simplicity while keeping the rest of the paragraph unchanged.
+
+✅ Do not change anything outside the selected sentence.
+✅ Ensure grammar, punctuation, and formatting are preserved.
+✅ Preserve tone and meaning. Be concise and accurate.
+
+🔒 Before returning:
+- Verify that your final "updatedParagraph" exactly matches the original paragraph except for the selected sentence.
+- Ensure "replacementRange" accurately reflects the character positions where changes were made inside the paragraph.
+- Double-check that you return **valid JSON** in this exact format only:
+
+{
+  "updatedParagraph": "FULL paragraph with only the selected sentence changed",
+  "replacementRange": [startIndex, endIndex]
+}
+
+⛔️ Do not return any quotes or explanations.
+    `.trim();
+
+    userPrompt = `
 Paragraph:
-"${paragraphText}"
+${paragraphText}
 
-Selected text to rewrite:
-"${text}"
-  `.trim();
-      break;
+Selected text to ${action === 'rewrite' ? 'rewrite' : 'simplify'}:
+${text}
+    `.trim();
+  } else if (action === 'link') {
+    systemPrompt = `
+You are a technical writing assistant.
 
-    case 'simplify':
-      systemPrompt = 'You simplify complex ideas for a general audience without losing important meaning.';
-      userPrompt = `Simplify this text for better understanding:\n\n"${text}"`;
-      break;
+You will receive:
+- A full paragraph
+- A selected text range from that paragraph
 
-    case 'link':
-      systemPrompt = 'You are a helpful assistant that provides a single, relevant URL in response to user queries.';
-      userPrompt = `Provide a direct and useful URL related to the following topic:\n\n"${text}"\n\nJust return the URL.`;
-      break;
+Your task:
+1. Find a single meaningful **phrase** in the selected text that would benefit from a hyperlink.
+2. Return only the phrase, its **start and end index** within the original paragraph, and a useful URL.
 
-    default:
-      return new Response('Invalid action', { status: 400 });
+Return your response in this strict JSON format:
+
+{
+  "phrase": "Account abstraction",
+  "range": [startIndex, endIndex],
+  "url": "https://example.com/article"
+}
+
+✅ Make sure the phrase exists verbatim in the paragraph text.
+✅ Only return one phrase + link.
+⛔️ Do not explain or return anything else.
+    `.trim();
+
+    userPrompt = `
+Paragraph:
+${paragraphText}
+
+Selected text:
+${text}
+    `.trim();
+  } else {
+    return new Response('Invalid action', { status: 400 });
   }
 
   const chatResponse = await openai.chat.completions.create({
-    model: 'gpt-4',
+    model: 'gpt-4-0125-preview',
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
-    temperature: 0.5,
+    temperature: 0,
   });
 
-  const result = chatResponse.choices[0]?.message?.content?.trim();
-  console.log(result, systemPrompt, userPrompt)
+  const rawResult = chatResponse.choices[0]?.message?.content?.trim() ?? '';
 
-  return Response.json({ result });
+  if (action === 'link') {
+    try {
+      const parsed: LinkResponse = JSON.parse(rawResult);
+      const found = paragraphText.slice(parsed.range[0], parsed.range[1]);
+
+      if (found !== parsed.phrase) {
+        const start = paragraphText.indexOf(parsed.phrase);
+        if (start === -1) {
+          throw new Error('Phrase not found in paragraph');
+        }
+
+        const end = start + parsed.phrase.length;
+        parsed.range = [start, end]; 
+        console.warn('⚠️ AI range was incorrect. Fixed range:', parsed.range);
+      }
+
+      return Response.json({
+        result: parsed
+      });
+    } catch (e) {
+      console.error('Failed to parse link result:', rawResult, e);
+      return new Response('Failed to parse link result', { status: 500 });
+    }
+  }
+
+  if (needsStructuredOutput) {
+    try {
+      const parsed: StructuredResult = JSON.parse(rawResult);
+      return Response.json({ result: parsed });
+    } catch (e) {
+      console.error('Failed to parse OpenAI JSON output:', rawResult, e);
+      return new Response('Failed to parse result', { status: 500 });
+    }
+  }
+
+  return Response.json({ result: rawResult });
 }
