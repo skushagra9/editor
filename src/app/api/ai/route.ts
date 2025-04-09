@@ -5,15 +5,24 @@ const openai = new OpenAI({
 });
 
 export async function POST(request: Request) {
-  const { text, action } = await request.json();
+  const { text, action, paragraphText } = await request.json();
+
+  console.log(text, action, paragraphText)
 
   let systemPrompt = '';
   let userPrompt = '';
 
   switch (action) {
     case 'rewrite':
-      systemPrompt = 'You are a professional copy editor. Rewrite text to improve clarity and tone while preserving the original meaning.';
-      userPrompt = `Rewrite the following professionally:\n\n"${text}"`;
+      systemPrompt = 'You are a professional copy editor. Improve clarity and tone of a specific section within a larger paragraph. Only rewrite the highlighted section, but use the full paragraph for context. Preserve original meaning. Return only the rewritten version of the highlighted section.';
+
+      userPrompt = `
+Paragraph:
+"${paragraphText}"
+
+Selected text to rewrite:
+"${text}"
+  `.trim();
       break;
 
     case 'simplify':

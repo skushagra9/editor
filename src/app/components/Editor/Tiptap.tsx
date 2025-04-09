@@ -18,6 +18,8 @@ const Tiptap = () => {
     if (!editor || !editor.isActive) return
     const { from, to } = editor.state.selection
     const selectedText = editor.state.doc.textBetween(from, to, ' ')
+    const paragraphNode = editor.state.doc.resolve(from).parent;
+    const paragraphText = paragraphNode.textContent;
     if (!selectedText) return alert('Please select some text first')
 
     setOriginalSelection({ from, to })
@@ -26,7 +28,7 @@ const Tiptap = () => {
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
-        body: JSON.stringify({ text: selectedText, action }),
+        body: JSON.stringify({ text: selectedText, action, paragraphText }),
       })
       const data = await res.json()
       setAiPreview(data.result)
