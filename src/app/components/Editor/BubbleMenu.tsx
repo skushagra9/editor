@@ -12,6 +12,7 @@ interface Props {
   processWithAI: (action: string) => void
   applyAIChange: () => void
   cancelAIChange: () => void
+  action: string | null
 }
 
 export const BubbleMenuAI = ({
@@ -23,7 +24,9 @@ export const BubbleMenuAI = ({
   processWithAI,
   applyAIChange,
   cancelAIChange,
+  action,
 }: Props) => {
+    console.log(action)
   return (
     <BubbleMenu
       editor={editor}

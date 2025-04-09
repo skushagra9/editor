@@ -72,6 +72,7 @@ const Tiptap = () => {
             processWithAI={processWithAI}
             applyAIChange={applyAIChange}
             cancelAIChange={cancelAIChange}
+            action={action}
           />
           <div className="border border-gray-200 rounded-lg p-4 min-h-[500px]">
             <EditorContent editor={editor} />
