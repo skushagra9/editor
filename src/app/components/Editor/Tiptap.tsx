@@ -92,7 +92,7 @@ const Tiptap = () => {
 
   return (
     <div className="relative max-w-3xl mx-auto mt-8 p-4">
-      <h1 className="text-2xl font-bold mb-6">Assignment Editor</h1>
+      <h1 className="text-2xl font-bold mb-6">Editor</h1>
       {editor && (
         <>
           <Toolbar editor={editor} />
